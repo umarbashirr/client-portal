@@ -1,7 +1,24 @@
 {
-  "name": "client-portal",
+  "name": "client-portal-hub",
   "version": "0.1.0",
   "private": true,
+  "description": "A comprehensive SaaS platform for freelancers and consultants to create branded client portals",
+  "homepage": "https://clientportalhub.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/umarbashirr/client-portal.git"
+  },
+  "keywords": [
+    "client-portal",
+    "saas",
+    "freelancer",
+    "consultant",
+    "invoicing",
+    "file-sharing",
+    "client-management",
+    "nextjs",
+    "typescript"
+  ],
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",

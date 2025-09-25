@@ -1,10 +1,10 @@
 ---
-description: Client Portal Generator project-specific development guidelines
+description: Client Portal Hub project-specific development guidelines
 ---
 
-# Client Portal Generator - Project Guidelines
+# Client Portal Hub - Project Guidelines
 
-This rule provides specific guidance for developing the Client Portal Generator project. Reference [scope.md](mdc:scope.md) for complete project details.
+This rule provides specific guidance for developing the Client Portal Hub project. Reference [scope.md](mdc:scope.md) for complete project details.
 
 ## Project Overview
 
@@ -243,3 +243,4 @@ project_tasks (id, project_id, title, description, status, due_date, created_at)
 8. **Implement proper file handling with Supabase Storage**
 9. **Use Better Auth for authentication and authorization**
 10. **Follow Next.js App Router best practices**
+11. **Maintain brand consistency with Client Portal Hub identity**
