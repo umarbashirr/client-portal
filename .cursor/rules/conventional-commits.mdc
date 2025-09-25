@@ -1,0 +1,141 @@
+---
+alwaysApply: true
+description: Conventional Commits specification for better git commit messages
+---
+
+# Conventional Commits Rule
+
+Follow the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/#summary) for all git commit messages to ensure consistency, automation compatibility, and clear communication of changes.
+
+## Commit Message Structure
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+## Required Elements
+
+### Type (REQUIRED)
+
+- **feat**: New feature (correlates with MINOR in SemVer)
+- **fix**: Bug fix (correlates with PATCH in SemVer)
+- **docs**: Documentation changes
+- **style**: Code style changes (formatting, missing semicolons, etc.)
+- **refactor**: Code refactoring without feature changes
+- **perf**: Performance improvements
+- **test**: Adding or updating tests
+- **build**: Build system or external dependencies changes
+- **ci**: CI/CD pipeline changes
+- **chore**: Other changes that don't modify src or test files
+
+### Description (REQUIRED)
+
+- Use imperative mood ("add feature" not "added feature")
+- Start with lowercase letter
+- No period at the end
+- Keep it concise but descriptive
+
+### Scope (OPTIONAL)
+
+- Enclosed in parentheses: `feat(parser):`
+- Describes the section of codebase affected
+- Examples: `(api)`, `(ui)`, `(auth)`, `(database)`
+
+## Breaking Changes
+
+### Method 1: Exclamation mark
+
+```
+feat!: send email when product ships
+feat(api)!: send email when product ships
+```
+
+### Method 2: BREAKING CHANGE footer
+
+```
+feat: allow config to extend other configs
+
+BREAKING CHANGE: `extends` key in config file is now used for extending other config files
+```
+
+## Examples
+
+### Basic commits
+
+```
+feat: add user authentication
+fix: resolve memory leak in data processing
+docs: update API documentation
+style: format code with prettier
+refactor: extract validation logic into separate module
+perf: optimize database queries
+test: add unit tests for user service
+build: update webpack configuration
+ci: add automated testing pipeline
+chore: update dependencies
+```
+
+### With scope
+
+```
+feat(auth): add OAuth2 integration
+fix(ui): correct button alignment on mobile
+docs(api): add endpoint documentation
+```
+
+### With body and footers
+
+```
+fix: prevent racing of requests
+
+Introduce a request id and a reference to latest request. Dismiss
+incoming responses other than from latest request.
+
+Remove timeouts which were used to mitigate the racing issue but are
+obsolete now.
+
+Reviewed-by: Z
+Refs: #123
+```
+
+### Breaking changes
+
+```
+feat!: send email to customer when product ships
+
+BREAKING CHANGE: email service now requires SMTP configuration
+```
+
+## Guidelines
+
+1. **Consistency**: Always use the same format across the project
+2. **Clarity**: Make it clear what changed and why
+3. **Automation**: Enable automated changelog generation and version bumping
+4. **Collaboration**: Help team members understand changes quickly
+5. **History**: Create a clean, searchable commit history
+
+## Common Mistakes to Avoid
+
+- ❌ `feat: Added new feature` (use imperative mood)
+- ❌ `fix: bug` (too vague)
+- ❌ `update` (not a standard type)
+- ❌ `feat: Add feature.` (no period at end)
+- ❌ `FEAT: add feature` (keep type lowercase)
+
+- ✅ `feat: add new feature`
+- ✅ `fix: resolve memory leak in user service`
+- ✅ `docs: update README with setup instructions`
+- ✅ `feat: add feature`
+- ✅ `feat: add feature`
+
+## Benefits
+
+- **Automated changelogs**: Tools can generate changelogs from commit messages
+- **Semantic versioning**: Automatic version bumping based on commit types
+- **Clear communication**: Team members understand changes at a glance
+- **Better collaboration**: Easier to review and understand changes
+- **Tool integration**: Works with many CI/CD and project management tools
