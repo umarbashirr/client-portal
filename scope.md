@@ -136,12 +136,12 @@ A comprehensive SaaS platform that enables freelancers and consultants to create
 
 #### Week 1-2: Project Setup
 
-- [ ] Next.js project initialization with TypeScript
-- [ ] Tailwind CSS + shadcn/ui setup
-- [ ] Database schema design and Prisma setup
+- [x] Next.js project initialization with TypeScript (src directory structure)
+- [x] Tailwind CSS + shadcn/ui setup
+- [x] Database schema design and Prisma setup
 - [ ] Supabase project configuration
-- [ ] Better Auth integration
-- [ ] Basic routing and layout structure
+- [x] Better Auth integration (src/lib/auth.ts, src/lib/auth-client.ts)
+- [x] Basic routing and layout structure (src/app/)
 
 #### Week 3-4: Authentication & User Management
 
@@ -255,11 +255,12 @@ project_tasks (id, project_id, title, description, status, due_date, created_at)
 
 ### Authentication
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `POST /api/auth/forgot-password`
-- `POST /api/auth/reset-password`
+- `POST /api/auth/sign-up` (Better Auth)
+- `POST /api/auth/sign-in` (Better Auth)
+- `POST /api/auth/sign-out` (Better Auth)
+- `POST /api/auth/forgot-password` (Better Auth)
+- `POST /api/auth/reset-password` (Better Auth)
+- `GET /api/auth/session` (Better Auth)
 
 ### Portals
 
@@ -268,6 +269,8 @@ project_tasks (id, project_id, title, description, status, due_date, created_at)
 - `GET /api/portals/[id]` - Get portal details
 - `PUT /api/portals/[id]` - Update portal
 - `DELETE /api/portals/[id]` - Delete portal
+
+_Note: All API routes are located in `src/app/api/` directory_
 
 ### Files
 

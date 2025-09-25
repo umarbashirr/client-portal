@@ -150,28 +150,36 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ```
 client-portal-hub/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   ├── (auth)/            # Authentication pages
-│   ├── dashboard/         # Dashboard pages
-│   ├── portals/           # Portal management
-│   └── globals.css        # Global styles
-├── components/            # React components
-│   ├── ui/               # shadcn/ui components
-│   ├── auth/             # Authentication components
-│   ├── portal/           # Portal-specific components
-│   └── shared/           # Shared components
-├── lib/                  # Utility libraries
-│   ├── auth.ts           # Better Auth configuration
-│   ├── prisma.ts         # Prisma client
-│   ├── utils.ts          # Utility functions
-│   └── schemas/          # Zod validation schemas
-├── prisma/               # Database schema and migrations
-│   ├── schema.prisma     # Prisma schema
-│   └── migrations/       # Database migrations
-├── public/               # Static assets
-└── .cursor/              # Cursor AI rules
-    └── rules/            # Development guidelines
+├── src/                   # Source code directory
+│   ├── app/              # Next.js App Router
+│   │   ├── api/          # API routes
+│   │   │   └── auth/     # Authentication API routes
+│   │   ├── (auth)/       # Authentication pages
+│   │   ├── dashboard/    # Dashboard pages
+│   │   ├── portals/      # Portal management
+│   │   ├── globals.css   # Global styles
+│   │   ├── layout.tsx    # Root layout
+│   │   └── page.tsx      # Home page
+│   ├── components/       # React components
+│   │   ├── ui/          # shadcn/ui components
+│   │   ├── auth/        # Authentication components
+│   │   ├── portal/      # Portal-specific components
+│   │   └── shared/      # Shared components
+│   ├── lib/             # Utility libraries
+│   │   ├── auth.ts      # Better Auth server config
+│   │   ├── auth-client.ts # Better Auth client config
+│   │   ├── prisma.ts    # Prisma client
+│   │   ├── utils.ts     # Utility functions
+│   │   └── schemas/     # Zod validation schemas
+│   └── generated/       # Generated files
+│       └── prisma/      # Prisma generated client
+├── prisma/              # Database schema and migrations
+│   ├── schema.prisma    # Prisma schema
+│   └── migrations/      # Database migrations
+├── public/              # Static assets
+├── .cursor/             # Cursor AI rules
+│   └── rules/           # Development guidelines
+└── components.json      # shadcn/ui configuration
 ```
 
 ## 🏗️ Development Phases

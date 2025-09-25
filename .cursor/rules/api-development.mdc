@@ -9,15 +9,16 @@ description: API development guidelines for Next.js App Router and client portal
 
 ### File Structure
 
-- Place API routes in `app/api/` directory
-- Use route groups for organization: `app/api/(auth)/`, `app/api/(portals)/`
+- Place API routes in `src/app/api/` directory
+- Use route groups for organization: `src/app/api/(auth)/`, `src/app/api/(portals)/`
 - Follow RESTful conventions for endpoint naming
 - Use TypeScript for all API routes
+- All source code is organized under the `src/` directory
 
 ### Route Handler Structure
 
 ```typescript
-// app/api/portals/route.ts
+// src/app/api/portals/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
 ### Better Auth Integration
 
 ```typescript
-// lib/auth.ts
+// src/lib/auth.ts
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
@@ -124,7 +125,7 @@ export async function requireAuth(request: NextRequest) {
 ### Role-Based Access Control
 
 ```typescript
-// lib/rbac.ts
+// src/lib/rbac.ts
 export enum UserRole {
   ADMIN = "admin",
   CLIENT = "client",
@@ -161,7 +162,7 @@ export async function requireRole(requiredRole: UserRole) {
 ### Schema Definition
 
 ```typescript
-// lib/schemas/portal.ts
+// src/lib/schemas/portal.ts
 import { z } from "zod";
 
 export const createPortalSchema = z.object({
@@ -221,7 +222,7 @@ export async function POST(request: NextRequest) {
 ### Prisma Client Setup
 
 ```typescript
-// lib/prisma.ts
+// src/lib/prisma.ts
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
@@ -236,7 +237,7 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 ### Database Operations
 
 ```typescript
-// lib/services/portal.ts
+// src/lib/services/portal.ts
 import { prisma } from "@/lib/prisma";
 import { CreatePortalData, UpdatePortalData } from "@/lib/schemas/portal";
 
@@ -298,7 +299,7 @@ export class PortalService {
 ### Custom Error Classes
 
 ```typescript
-// lib/errors.ts
+// src/lib/errors.ts
 export class AppError extends Error {
   constructor(
     message: string,
@@ -332,7 +333,7 @@ export class UnauthorizedError extends AppError {
 ### Error Handling Middleware
 
 ```typescript
-// lib/error-handler.ts
+// src/lib/error-handler.ts
 import { NextResponse } from "next/server";
 import { AppError } from "./errors";
 
@@ -369,7 +370,7 @@ export function handleApiError(error: unknown) {
 ### Supabase Storage Integration
 
 ```typescript
-// lib/storage.ts
+// src/lib/storage.ts
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -399,7 +400,7 @@ export async function getFileUrl(bucket: string, path: string) {
 ### File Upload API Route
 
 ```typescript
-// app/api/portals/[id]/files/route.ts
+// src/app/api/portals/[id]/files/route.ts
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -452,7 +453,7 @@ export async function POST(
 ### Rate Limiting Implementation
 
 ```typescript
-// lib/rate-limit.ts
+// src/lib/rate-limit.ts
 import { NextRequest } from "next/server";
 
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -497,7 +498,7 @@ export async function POST(request: NextRequest) {
 ### OpenAPI/Swagger Integration
 
 ```typescript
-// lib/openapi.ts
+// src/lib/openapi.ts
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV3,
@@ -541,7 +542,7 @@ export const generator = new OpenApiGeneratorV3(registry.definitions);
 ### API Route Testing
 
 ```typescript
-// __tests__/api/portals.test.ts
+// src/__tests__/api/portals.test.ts
 import { POST } from "@/app/api/portals/route";
 import { NextRequest } from "next/server";
 
