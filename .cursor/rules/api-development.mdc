@@ -1,0 +1,566 @@
+---
+globs: app/api/**/*,src/api/**/*,lib/api/**/*
+description: API development guidelines for Next.js App Router and client portal features
+---
+
+# API Development Guidelines
+
+## Next.js App Router API Routes
+
+### File Structure
+
+- Place API routes in `app/api/` directory
+- Use route groups for organization: `app/api/(auth)/`, `app/api/(portals)/`
+- Follow RESTful conventions for endpoint naming
+- Use TypeScript for all API routes
+
+### Route Handler Structure
+
+```typescript
+// app/api/portals/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+
+const createPortalSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+});
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const portals = await prisma.portal.findMany({
+      where: { organizationId: session.user.organizationId },
+    });
+
+    return NextResponse.json({ portals });
+  } catch (error) {
+    console.error("Error fetching portals:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const validatedData = createPortalSchema.parse(body);
+
+    const portal = await prisma.portal.create({
+      data: {
+        ...validatedData,
+        organizationId: session.user.organizationId,
+      },
+    });
+
+    return NextResponse.json({ portal }, { status: 201 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation error", details: error.errors },
+        { status: 400 }
+      );
+    }
+
+    console.error("Error creating portal:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Authentication and Authorization
+
+### Better Auth Integration
+
+```typescript
+// lib/auth.ts
+import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
+import { prisma } from "./prisma";
+
+export const auth = betterAuth({
+  database: prismaAdapter(prisma),
+  emailAndPassword: {
+    enabled: true,
+  },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    },
+  },
+});
+
+// Middleware for protected routes
+export async function requireAuth(request: NextRequest) {
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
+
+  if (!session) {
+    throw new Error("Unauthorized");
+  }
+
+  return session;
+}
+```
+
+### Role-Based Access Control
+
+```typescript
+// lib/rbac.ts
+export enum UserRole {
+  ADMIN = "admin",
+  CLIENT = "client",
+  VIEWER = "viewer",
+}
+
+export function hasPermission(
+  userRole: UserRole,
+  requiredRole: UserRole
+): boolean {
+  const roleHierarchy = {
+    [UserRole.VIEWER]: 1,
+    [UserRole.CLIENT]: 2,
+    [UserRole.ADMIN]: 3,
+  };
+
+  return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
+}
+
+// Usage in API routes
+export async function requireRole(requiredRole: UserRole) {
+  const session = await requireAuth();
+
+  if (!hasPermission(session.user.role, requiredRole)) {
+    throw new Error("Insufficient permissions");
+  }
+
+  return session;
+}
+```
+
+## Data Validation with Zod
+
+### Schema Definition
+
+```typescript
+// lib/schemas/portal.ts
+import { z } from "zod";
+
+export const createPortalSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name too long"),
+  description: z.string().max(500, "Description too long").optional(),
+  domain: z.string().url("Invalid domain").optional(),
+  settings: z.object({
+    theme: z.object({
+      primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid color"),
+      logo: z.string().url().optional(),
+    }),
+    features: z.object({
+      fileSharing: z.boolean().default(true),
+      messaging: z.boolean().default(true),
+      invoicing: z.boolean().default(true),
+    }),
+  }),
+});
+
+export const updatePortalSchema = createPortalSchema.partial();
+
+export type CreatePortalData = z.infer<typeof createPortalSchema>;
+export type UpdatePortalData = z.infer<typeof updatePortalSchema>;
+```
+
+### Validation in API Routes
+
+```typescript
+import { createPortalSchema } from "@/lib/schemas/portal";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const validatedData = createPortalSchema.parse(body);
+
+    // Use validated data
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          details: error.errors.map((e) => ({
+            field: e.path.join("."),
+            message: e.message,
+          })),
+        },
+        { status: 400 }
+      );
+    }
+    throw error;
+  }
+}
+```
+
+## Database Operations with Prisma
+
+### Prisma Client Setup
+
+```typescript
+// lib/prisma.ts
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
+
+### Database Operations
+
+```typescript
+// lib/services/portal.ts
+import { prisma } from "@/lib/prisma";
+import { CreatePortalData, UpdatePortalData } from "@/lib/schemas/portal";
+
+export class PortalService {
+  static async create(data: CreatePortalData, organizationId: string) {
+    return prisma.portal.create({
+      data: {
+        ...data,
+        organizationId,
+        slug: this.generateSlug(data.name),
+      },
+      include: {
+        organization: true,
+        clients: true,
+      },
+    });
+  }
+
+  static async findBySlug(slug: string) {
+    return prisma.portal.findUnique({
+      where: { slug },
+      include: {
+        organization: true,
+        clients: true,
+        files: true,
+        invoices: true,
+      },
+    });
+  }
+
+  static async update(id: string, data: UpdatePortalData) {
+    return prisma.portal.update({
+      where: { id },
+      data,
+      include: {
+        organization: true,
+        clients: true,
+      },
+    });
+  }
+
+  static async delete(id: string) {
+    return prisma.portal.delete({
+      where: { id },
+    });
+  }
+
+  private static generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  }
+}
+```
+
+## Error Handling
+
+### Custom Error Classes
+
+```typescript
+// lib/errors.ts
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public code?: string
+  ) {
+    super(message);
+    this.name = "AppError";
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string, public details?: any) {
+    super(message, 400, "VALIDATION_ERROR");
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource: string) {
+    super(`${resource} not found`, 404, "NOT_FOUND");
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor() {
+    super("Unauthorized", 401, "UNAUTHORIZED");
+  }
+}
+```
+
+### Error Handling Middleware
+
+```typescript
+// lib/error-handler.ts
+import { NextResponse } from "next/server";
+import { AppError } from "./errors";
+
+export function handleApiError(error: unknown) {
+  console.error("API Error:", error);
+
+  if (error instanceof AppError) {
+    return NextResponse.json(
+      {
+        error: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+      },
+      { status: error.statusCode }
+    );
+  }
+
+  if (error instanceof Error) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json(
+    { error: "Unknown error occurred" },
+    { status: 500 }
+  );
+}
+```
+
+## File Upload Handling
+
+### Supabase Storage Integration
+
+```typescript
+// lib/storage.ts
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function uploadFile(file: File, bucket: string, path: string) {
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(path, file);
+
+  if (error) {
+    throw new Error(`Upload failed: ${error.message}`);
+  }
+
+  return data;
+}
+
+export async function getFileUrl(bucket: string, path: string) {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+
+  return data.publicUrl;
+}
+```
+
+### File Upload API Route
+
+```typescript
+// app/api/portals/[id]/files/route.ts
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await requireAuth();
+    const formData = await request.formData();
+    const file = formData.get("file") as File;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Validate file type and size
+    const allowedTypes = ["image/jpeg", "image/png", "application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
+    }
+
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: "File too large" }, { status: 400 });
+    }
+
+    // Upload to Supabase Storage
+    const filePath = `portals/${params.id}/${Date.now()}-${file.name}`;
+    const uploadData = await uploadFile(file, "client-portal", filePath);
+
+    // Save file record to database
+    const fileRecord = await prisma.file.create({
+      data: {
+        name: file.name,
+        path: uploadData.path,
+        size: file.size,
+        type: file.type,
+        portalId: params.id,
+        uploadedBy: session.user.id,
+      },
+    });
+
+    return NextResponse.json({ file: fileRecord });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+```
+
+## Rate Limiting
+
+### Rate Limiting Implementation
+
+```typescript
+// lib/rate-limit.ts
+import { NextRequest } from "next/server";
+
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+export function rateLimit(
+  identifier: string,
+  limit: number = 100,
+  windowMs: number = 15 * 60 * 1000 // 15 minutes
+) {
+  const now = Date.now();
+  const key = identifier;
+  const record = rateLimitMap.get(key);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs });
+    return { success: true, remaining: limit - 1 };
+  }
+
+  if (record.count >= limit) {
+    return { success: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { success: true, remaining: limit - record.count };
+}
+
+// Usage in API routes
+export async function POST(request: NextRequest) {
+  const ip = request.ip ?? "127.0.0.1";
+  const rateLimitResult = rateLimit(ip, 10, 60000); // 10 requests per minute
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
+  // Continue with request processing
+}
+```
+
+## API Documentation
+
+### OpenAPI/Swagger Integration
+
+```typescript
+// lib/openapi.ts
+import {
+  OpenAPIRegistry,
+  OpenApiGeneratorV3,
+} from "@asteasolutions/zod-to-openapi";
+
+const registry = new OpenAPIRegistry();
+
+// Register schemas
+registry.register("Portal", createPortalSchema);
+
+// Register endpoints
+registry.registerPath({
+  method: "get",
+  path: "/api/portals",
+  description: "Get all portals for the authenticated user",
+  responses: {
+    200: {
+      description: "List of portals",
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            properties: {
+              portals: {
+                type: "array",
+                items: { $ref: "#/components/schemas/Portal" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+});
+
+export const generator = new OpenApiGeneratorV3(registry.definitions);
+```
+
+## Testing API Routes
+
+### API Route Testing
+
+```typescript
+// __tests__/api/portals.test.ts
+import { POST } from "@/app/api/portals/route";
+import { NextRequest } from "next/server";
+
+describe("/api/portals", () => {
+  it("should create a new portal", async () => {
+    const request = new NextRequest("http://localhost:3000/api/portals", {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Test Portal",
+        description: "A test portal",
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.portal).toHaveProperty("id");
+    expect(data.portal.name).toBe("Test Portal");
+  });
+});
+```

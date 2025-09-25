@@ -1,0 +1,793 @@
+---
+globs: prisma/**/*,lib/prisma/**/*,lib/schemas/**/*
+description: Database and Prisma ORM development guidelines
+---
+
+# Database and Prisma Development Guidelines
+
+## Prisma Schema Design
+
+### Schema Structure
+
+```prisma
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User and Organization Models
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  avatar         String?
+  role           UserRole @default(CLIENT)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  portals        Portal[]
+  uploadedFiles  File[]
+  sentMessages   Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageRecipient")
+
+  @@map("users")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  members  User[]
+  portals  Portal[]
+
+  @@map("organizations")
+}
+
+model Portal {
+  id             String      @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String      @unique
+  domain         String?
+  settings       Json?
+  status         PortalStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id])
+  clients      PortalClient[]
+  files        File[]
+  invoices     Invoice[]
+  messages     Message[]
+  projects     Project[]
+
+  @@map("portals")
+}
+
+model PortalClient {
+  id          String           @id @default(cuid())
+  portalId    String
+  clientEmail String
+  accessToken String           @unique
+  status      ClientStatus     @default(INVITED)
+  invitedAt   DateTime         @default(now())
+  lastAccess  DateTime?
+
+  // Relations
+  portal Portal @relation(fields: [portalId], references: [id])
+
+  @@unique([portalId, clientEmail])
+  @@map("portal_clients")
+}
+
+model File {
+  id        String   @id @default(cuid())
+  portalId  String
+  name      String
+  path      String
+  size      Int
+  type      String
+  uploadedBy String
+  createdAt DateTime @default(now())
+
+  // Relations
+  portal       Portal            @relation(fields: [portalId], references: [id])
+  uploader     User              @relation(fields: [uploadedBy], references: [id])
+  permissions  FilePermission[]
+  attachments  MessageAttachment[]
+
+  @@map("files")
+}
+
+model FilePermission {
+  id           String           @id @default(cuid())
+  fileId       String
+  clientId     String
+  permissionType PermissionType @default(READ)
+
+  // Relations
+  file   File        @relation(fields: [fileId], references: [id])
+  client PortalClient @relation(fields: [clientId], references: [id])
+
+  @@unique([fileId, clientId])
+  @@map("file_permissions")
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  portalId    String
+  number      String
+  clientEmail String
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("USD")
+  status      InvoiceStatus @default(DRAFT)
+  dueDate     DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  portal Portal        @relation(fields: [portalId], references: [id])
+  items  InvoiceItem[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  rate        Decimal @db.Decimal(10, 2)
+  amount      Decimal @db.Decimal(10, 2)
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  portalId    String
+  senderId    String
+  recipientId String?
+  content     String
+  type        MessageType @default(TEXT)
+  createdAt   DateTime    @default(now())
+
+  // Relations
+  portal     Portal              @relation(fields: [portalId], references: [id])
+  sender     User                @relation("MessageSender", fields: [senderId], references: [id])
+  recipient  User?               @relation("MessageRecipient", fields: [recipientId], references: [id])
+  attachments MessageAttachment[]
+
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String @id @default(cuid())
+  messageId String
+  fileId    String
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id])
+  file    File    @relation(fields: [fileId], references: [id])
+
+  @@map("message_attachments")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  portalId    String
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  portal Portal     @relation(fields: [portalId], references: [id])
+  tasks  ProjectTask[]
+
+  @@map("projects")
+}
+
+model ProjectTask {
+  id          String      @id @default(cuid())
+  projectId   String
+  title       String
+  description String?
+  status      TaskStatus  @default(PENDING)
+  dueDate     DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("project_tasks")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  CLIENT
+  VIEWER
+}
+
+enum PortalStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ClientStatus {
+  INVITED
+  ACTIVE
+  INACTIVE
+}
+
+enum PermissionType {
+  READ
+  WRITE
+  ADMIN
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SYSTEM
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+```
+
+## Prisma Client Usage
+
+### Client Setup
+
+```typescript
+// lib/prisma.ts
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+```
+
+### Database Operations
+
+#### Basic CRUD Operations
+
+```typescript
+// lib/services/base.ts
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+
+export abstract class BaseService<T, CreateInput, UpdateInput> {
+  protected model: any;
+
+  constructor(model: any) {
+    this.model = model;
+  }
+
+  async create(data: CreateInput): Promise<T> {
+    return this.model.create({ data });
+  }
+
+  async findById(id: string): Promise<T | null> {
+    return this.model.findUnique({ where: { id } });
+  }
+
+  async findMany(where?: any, include?: any): Promise<T[]> {
+    return this.model.findMany({ where, include });
+  }
+
+  async update(id: string, data: UpdateInput): Promise<T> {
+    return this.model.update({ where: { id }, data });
+  }
+
+  async delete(id: string): Promise<T> {
+    return this.model.delete({ where: { id } });
+  }
+}
+```
+
+#### Portal Service
+
+```typescript
+// lib/services/portal.ts
+import { prisma } from "@/lib/prisma";
+import { Portal, Prisma } from "@prisma/client";
+
+export class PortalService extends BaseService<
+  Portal,
+  Prisma.PortalCreateInput,
+  Prisma.PortalUpdateInput
+> {
+  constructor() {
+    super(prisma.portal);
+  }
+
+  async findBySlug(slug: string): Promise<Portal | null> {
+    return prisma.portal.findUnique({
+      where: { slug },
+      include: {
+        organization: true,
+        clients: true,
+        files: true,
+        invoices: true,
+        projects: true,
+      },
+    });
+  }
+
+  async findByOrganization(organizationId: string): Promise<Portal[]> {
+    return prisma.portal.findMany({
+      where: { organizationId },
+      include: {
+        clients: true,
+        _count: {
+          select: {
+            files: true,
+            invoices: true,
+            projects: true,
+          },
+        },
+      },
+    });
+  }
+
+  async createWithDefaults(
+    data: Prisma.PortalCreateInput,
+    organizationId: string
+  ): Promise<Portal> {
+    return prisma.portal.create({
+      data: {
+        ...data,
+        organizationId,
+        slug: this.generateSlug(data.name as string),
+        settings: {
+          theme: {
+            primaryColor: "#3b82f6",
+            logo: null,
+          },
+          features: {
+            fileSharing: true,
+            messaging: true,
+            invoicing: true,
+          },
+        },
+      },
+    });
+  }
+
+  private generateSlug(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  }
+}
+```
+
+#### File Service
+
+```typescript
+// lib/services/file.ts
+import { prisma } from "@/lib/prisma";
+import { File, Prisma } from "@prisma/client";
+
+export class FileService extends BaseService<
+  File,
+  Prisma.FileCreateInput,
+  Prisma.FileUpdateInput
+> {
+  constructor() {
+    super(prisma.file);
+  }
+
+  async findByPortal(portalId: string): Promise<File[]> {
+    return prisma.file.findMany({
+      where: { portalId },
+      include: {
+        uploader: {
+          select: { name: true, email: true },
+        },
+        permissions: {
+          include: {
+            client: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async findByClient(portalId: string, clientEmail: string): Promise<File[]> {
+    const client = await prisma.portalClient.findFirst({
+      where: { portalId, clientEmail },
+    });
+
+    if (!client) {
+      return [];
+    }
+
+    return prisma.file.findMany({
+      where: {
+        portalId,
+        OR: [
+          { permissions: { some: { clientId: client.id } } },
+          { permissions: { none: {} } }, // Public files
+        ],
+      },
+      include: {
+        uploader: {
+          select: { name: true, email: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async createWithPermissions(
+    data: Prisma.FileCreateInput,
+    permissions: {
+      clientId: string;
+      permissionType: "READ" | "WRITE" | "ADMIN";
+    }[]
+  ): Promise<File> {
+    return prisma.file.create({
+      data: {
+        ...data,
+        permissions: {
+          create: permissions,
+        },
+      },
+      include: {
+        permissions: {
+          include: {
+            client: true,
+          },
+        },
+      },
+    });
+  }
+}
+```
+
+## Database Migrations
+
+### Migration Best Practices
+
+```typescript
+// prisma/migrations/20240101000000_add_portal_settings/migration.sql
+-- Add portal settings column
+ALTER TABLE "portals" ADD COLUMN "settings" JSONB;
+
+-- Add index for better performance
+CREATE INDEX "portals_organization_id_idx" ON "portals"("organization_id");
+CREATE INDEX "portals_slug_idx" ON "portals"("slug");
+CREATE INDEX "files_portal_id_idx" ON "files"("portal_id");
+CREATE INDEX "invoices_portal_id_idx" ON "invoices"("portal_id");
+```
+
+### Migration Scripts
+
+```typescript
+// scripts/migrate-data.ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function migratePortalSettings() {
+  const portals = await prisma.portal.findMany({
+    where: { settings: null },
+  });
+
+  for (const portal of portals) {
+    await prisma.portal.update({
+      where: { id: portal.id },
+      data: {
+        settings: {
+          theme: {
+            primaryColor: "#3b82f6",
+            logo: null,
+          },
+          features: {
+            fileSharing: true,
+            messaging: true,
+            invoicing: true,
+          },
+        },
+      },
+    });
+  }
+
+  console.log(`Migrated ${portals.length} portals`);
+}
+
+migratePortalSettings()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());
+```
+
+## Database Optimization
+
+### Indexing Strategy
+
+```sql
+-- Performance indexes
+CREATE INDEX CONCURRENTLY "users_email_idx" ON "users"("email");
+CREATE INDEX CONCURRENTLY "portals_organization_id_idx" ON "portals"("organization_id");
+CREATE INDEX CONCURRENTLY "portals_slug_idx" ON "portals"("slug");
+CREATE INDEX CONCURRENTLY "files_portal_id_idx" ON "files"("portal_id");
+CREATE INDEX CONCURRENTLY "invoices_portal_id_idx" ON "invoices"("portal_id");
+CREATE INDEX CONCURRENTLY "messages_portal_id_idx" ON "messages"("portal_id");
+CREATE INDEX CONCURRENTLY "project_tasks_project_id_idx" ON "project_tasks"("project_id");
+
+-- Composite indexes for common queries
+CREATE INDEX CONCURRENTLY "files_portal_created_idx" ON "files"("portal_id", "created_at" DESC);
+CREATE INDEX CONCURRENTLY "invoices_portal_status_idx" ON "invoices"("portal_id", "status");
+CREATE INDEX CONCURRENTLY "messages_portal_created_idx" ON "messages"("portal_id", "created_at" DESC);
+```
+
+### Query Optimization
+
+```typescript
+// Optimized queries with proper includes
+export async function getPortalWithStats(portalId: string) {
+  return prisma.portal.findUnique({
+    where: { id: portalId },
+    include: {
+      organization: true,
+      clients: {
+        select: {
+          id: true,
+          clientEmail: true,
+          status: true,
+          lastAccess: true,
+        },
+      },
+      _count: {
+        select: {
+          files: true,
+          invoices: true,
+          projects: true,
+          messages: true,
+        },
+      },
+    },
+  });
+}
+
+// Paginated queries
+export async function getFilesPaginated(
+  portalId: string,
+  page: number = 1,
+  limit: number = 20
+) {
+  const skip = (page - 1) * limit;
+
+  const [files, total] = await Promise.all([
+    prisma.file.findMany({
+      where: { portalId },
+      include: {
+        uploader: {
+          select: { name: true, email: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.file.count({ where: { portalId } }),
+  ]);
+
+  return {
+    files,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  };
+}
+```
+
+## Data Validation with Zod
+
+### Schema Definitions
+
+```typescript
+// lib/schemas/database.ts
+import { z } from "zod";
+
+export const createPortalSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name too long"),
+  description: z.string().max(500, "Description too long").optional(),
+  domain: z.string().url("Invalid domain").optional(),
+  settings: z.object({
+    theme: z.object({
+      primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid color"),
+      logo: z.string().url().optional(),
+    }),
+    features: z.object({
+      fileSharing: z.boolean().default(true),
+      messaging: z.boolean().default(true),
+      invoicing: z.boolean().default(true),
+    }),
+  }),
+});
+
+export const createFileSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  path: z.string().min(1, "Path is required"),
+  size: z.number().positive("Size must be positive"),
+  type: z.string().min(1, "Type is required"),
+  portalId: z.string().cuid("Invalid portal ID"),
+  uploadedBy: z.string().cuid("Invalid user ID"),
+});
+
+export const createInvoiceSchema = z.object({
+  portalId: z.string().cuid("Invalid portal ID"),
+  clientEmail: z.string().email("Invalid email"),
+  amount: z.number().positive("Amount must be positive"),
+  currency: z.string().length(3, "Invalid currency code"),
+  dueDate: z.date().optional(),
+  items: z
+    .array(
+      z.object({
+        description: z.string().min(1, "Description is required"),
+        quantity: z.number().positive("Quantity must be positive"),
+        rate: z.number().positive("Rate must be positive"),
+        amount: z.number().positive("Amount must be positive"),
+      })
+    )
+    .min(1, "At least one item is required"),
+});
+```
+
+## Database Seeding
+
+### Seed Data
+
+```typescript
+// prisma/seed.ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  // Create organization
+  const organization = await prisma.organization.create({
+    data: {
+      name: "Demo Organization",
+      slug: "demo-org",
+      settings: {
+        theme: {
+          primaryColor: "#3b82f6",
+        },
+      },
+    },
+  });
+
+  // Create admin user
+  const admin = await prisma.user.create({
+    data: {
+      email: "admin@demo.com",
+      name: "Demo Admin",
+      role: "ADMIN",
+      organizationId: organization.id,
+    },
+  });
+
+  // Create portal
+  const portal = await prisma.portal.create({
+    data: {
+      name: "Demo Portal",
+      slug: "demo-portal",
+      organizationId: organization.id,
+      settings: {
+        theme: {
+          primaryColor: "#3b82f6",
+          logo: null,
+        },
+        features: {
+          fileSharing: true,
+          messaging: true,
+          invoicing: true,
+        },
+      },
+    },
+  });
+
+  console.log("Seed data created successfully");
+}
+
+main()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());
+```
+
+## Database Monitoring
+
+### Query Performance Monitoring
+
+```typescript
+// lib/monitoring.ts
+import { prisma } from "@/lib/prisma";
+
+// Add query logging
+prisma.$use(async (params, next) => {
+  const before = Date.now();
+  const result = await next(params);
+  const after = Date.now();
+
+  console.log(
+    `Query ${params.model}.${params.action} took ${after - before}ms`
+  );
+
+  return result;
+});
+
+// Health check
+export async function checkDatabaseHealth() {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return { status: "healthy", timestamp: new Date().toISOString() };
+  } catch (error) {
+    return {
+      status: "unhealthy",
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+```

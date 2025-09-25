@@ -1,0 +1,245 @@
+---
+description: Client Portal Generator project-specific development guidelines
+---
+
+# Client Portal Generator - Project Guidelines
+
+This rule provides specific guidance for developing the Client Portal Generator project. Reference [scope.md](mdc:scope.md) for complete project details.
+
+## Project Overview
+
+A comprehensive SaaS platform that enables freelancers and consultants to create branded client portals for sharing invoices, files, and communicating with clients.
+
+## Tech Stack Requirements
+
+### Frontend
+
+- **Framework**: Next.js 14+ (App Router)
+- **Styling**: Tailwind CSS + shadcn/ui components
+- **State Management**: Zustand (lightweight) or React Context
+- **Forms**: React Hook Form + Zod validation
+- **UI Components**: shadcn/ui + custom components
+
+### Backend & Database
+
+- **Authentication**: Better Auth (modern auth solution)
+- **Database**: PostgreSQL (via Supabase)
+- **ORM**: Prisma
+- **File Storage**: Supabase Storage
+- **Email Service**: Nodemailer + SendGrid SMTP
+
+### Infrastructure
+
+- **Hosting**: Vercel (frontend) + Supabase (backend)
+- **CDN**: Vercel Edge Network
+- **Monitoring**: Vercel Analytics + Sentry
+- **Payments**: Dodo Payments (for subscriptions)
+
+## Core Features to Implement
+
+### 1. Authentication & User Management
+
+- Multi-tenant architecture (freelancers + their clients)
+- Role-based access control (Admin, Client, Viewer)
+- Social login (Google, GitHub)
+- Email verification and password reset
+- Profile management with avatar uploads
+- Organization/workspace management
+
+### 2. Portal Creation & Customization
+
+- Portal builder with drag-and-drop interface
+- Custom branding (logos, colors, fonts, favicon)
+- Domain customization (subdomain or custom domain)
+- Template library (industry-specific layouts)
+- Portal preview and testing environment
+- Mobile-responsive design optimization
+
+### 3. Invoice Management
+
+- Invoice creation with customizable templates
+- Automated numbering and sequential generation
+- Multiple currency support with real-time conversion
+- Tax calculations (configurable rates)
+- Payment tracking (Paid, Pending, Overdue)
+- Recurring invoices with automated generation
+- Invoice sharing via secure links
+- PDF generation with custom branding
+- Payment integration (Stripe, PayPal, bank transfers)
+
+### 4. File Management
+
+- Secure file uploads with virus scanning
+- Folder organization and categorization
+- File versioning and history tracking
+- Access control (public, private, client-specific)
+- File preview (images, PDFs, documents)
+- Bulk operations (upload, download, delete)
+- Storage quotas and usage monitoring
+- File sharing with expiration dates
+
+### 5. Communication System
+
+- Real-time messaging between freelancers and clients
+- Message threading and organization
+- File attachments in messages
+- Message status (sent, delivered, read)
+- Notification system (email, in-app, push)
+- Message templates for common responses
+- Message search and filtering
+- Export conversations (PDF, CSV)
+
+## Development Phases
+
+### Phase 1: Foundation (Weeks 1-4)
+
+- Next.js project initialization with TypeScript
+- Tailwind CSS + shadcn/ui setup
+- Database schema design and Prisma setup
+- Supabase project configuration
+- Better Auth integration
+- Basic routing and layout structure
+- User registration and login flows
+- Email verification system
+- Profile management
+- Basic dashboard layout
+- Role-based access control implementation
+
+### Phase 2: Core Features (Weeks 5-10)
+
+- Portal builder interface
+- Basic customization options (colors, logo)
+- Portal preview functionality
+- Portal deployment system
+- File upload system with Supabase Storage
+- File organization and categorization
+- File sharing and access control
+- Basic file preview functionality
+- Invoice creation interface
+- PDF generation with custom branding
+- Invoice sharing and tracking
+- Basic payment status management
+
+## Database Schema Guidelines
+
+### Core Tables
+
+```sql
+-- Users and Organizations
+users (id, email, name, avatar, role, created_at, updated_at)
+organizations (id, name, slug, settings, created_at, updated_at)
+organization_members (user_id, organization_id, role, joined_at)
+
+-- Portals
+portals (id, organization_id, name, slug, domain, settings, status, created_at)
+portal_clients (portal_id, client_email, access_token, status, invited_at)
+
+-- Files
+files (id, portal_id, name, path, size, type, uploaded_by, created_at)
+file_permissions (file_id, client_id, permission_type)
+
+-- Invoices
+invoices (id, portal_id, number, client_email, amount, currency, status, due_date, created_at)
+invoice_items (id, invoice_id, description, quantity, rate, amount)
+
+-- Messages
+messages (id, portal_id, sender_id, recipient_id, content, type, created_at)
+message_attachments (id, message_id, file_id)
+
+-- Projects
+projects (id, portal_id, name, description, status, created_at, updated_at)
+project_tasks (id, project_id, title, description, status, due_date, created_at)
+```
+
+## API Endpoints Structure
+
+### Authentication
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+
+### Portals
+
+- `GET /api/portals` - List user's portals
+- `POST /api/portals` - Create new portal
+- `GET /api/portals/[id]` - Get portal details
+- `PUT /api/portals/[id]` - Update portal
+- `DELETE /api/portals/[id]` - Delete portal
+
+### Files
+
+- `GET /api/portals/[id]/files` - List portal files
+- `POST /api/portals/[id]/files` - Upload file
+- `GET /api/files/[id]` - Download file
+- `DELETE /api/files/[id]` - Delete file
+
+### Invoices
+
+- `GET /api/portals/[id]/invoices` - List invoices
+- `POST /api/portals/[id]/invoices` - Create invoice
+- `GET /api/invoices/[id]` - Get invoice details
+- `PUT /api/invoices/[id]` - Update invoice
+- `POST /api/invoices/[id]/send` - Send invoice
+
+### Messages
+
+- `GET /api/portals/[id]/messages` - List messages
+- `POST /api/portals/[id]/messages` - Send message
+- `GET /api/messages/[id]` - Get message details
+
+## Security Requirements
+
+### Data Protection
+
+- Encryption at rest for sensitive data
+- HTTPS everywhere with proper SSL certificates
+- File upload security with virus scanning
+- SQL injection prevention through Prisma ORM
+- XSS protection with proper input sanitization
+
+### Access Control
+
+- JWT tokens for API authentication
+- Role-based permissions at database level
+- Portal isolation to prevent cross-portal access
+- Rate limiting on API endpoints
+- Session management with secure cookies
+
+### Compliance
+
+- GDPR compliance for EU users
+- Data retention policies and user data export
+- Privacy controls for client data
+- Audit logging for sensitive operations
+
+## Performance Requirements
+
+### Response Times
+
+- Page load: < 2 seconds
+- API responses: < 500ms
+- File uploads: Progress indication for large files
+- Real-time features: < 100ms latency
+
+### Scalability
+
+- Horizontal scaling with Vercel Edge Functions
+- Database optimization with proper indexing
+- CDN usage for static assets
+- Caching strategy for frequently accessed data
+
+## Development Guidelines
+
+1. **Always reference [scope.md](mdc:scope.md) for complete project requirements**
+2. **Follow the 4-phase development approach outlined in scope.md**
+3. **Implement proper error handling and validation using Zod**
+4. **Use TypeScript strictly with proper type definitions**
+5. **Follow accessibility guidelines and responsive design principles**
+6. **Implement proper security measures for multi-tenant architecture**
+7. **Use Prisma for all database operations**
+8. **Implement proper file handling with Supabase Storage**
+9. **Use Better Auth for authentication and authorization**
+10. **Follow Next.js App Router best practices**
